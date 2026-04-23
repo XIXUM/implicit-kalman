@@ -42,80 +42,120 @@ def boundedLine(y1,x1,y2,x2, height, width):
 
     return rr, cc, val
 
-def pyramidFlow(ffA, ffB, angularMatr, radialMatr, my, mx):
+def pyramidFlow(ffA, ffB, angularMatr, radialMatr, my, mx, img_a=None):
+    # Coarse-to-fine phase-based motion estimation.
+    # ffA / ffB are fftshift'd 2D FFTs of images A and B.
+    # angularMatr: per-pixel polar angle in frequency domain.
+    # radialMatr:  per-pixel distance from FFT centre.
+    # img_a: original image A pixels. When provided, the coarse UV estimate is used
+    #        to warp the full image before each finer octave's FFT. This handles
+    #        scaling correctly: warping only the Gabor response (shiftMatrixInt) cancels
+    #        the translational phase shift but not the spectral energy redistribution
+    #        caused by scaling. Warping the image before the FFT cancels both.
+    # Returns a (H,W,2) UV displacement map in pixels.
     halfPi = np.pi / 2
     rows, cols = ffA.shape
     halfX = cols // 2
-    # halfY = rows // 2
     octaves = int(np.log2(halfX))
-    aPr = 8 # angular precision
-                       # radial scale / eccentricity
+    aPr = 8
     dPi = 2 * np.pi
-    hh = rows / dPi
-    ww = cols / dPi
+    hh = rows / dPi   # pixel-to-radian scale for V axis
+    ww = cols / dPi   # pixel-to-radian scale for U axis
     haPr = aPr * 2
     faPr = haPr * 2
-    rO = octaves * 2 + 1
-    #rO = octaves + 1
-    step = halfX / rO
+    # Use log-scale octave bands: each band doubles the center frequency,
+    # matching the spectral distribution of natural images and giving one
+    # band per doubling of resolution.
+    rO = octaves + 1
 
-    vuMap = np.zeros((2, ffA.shape[-2], ffA.shape[-1]))
-
-    fH = np.sqrt(2)
-    aCbuf = [] # for Debug
-
+    vuMap = np.zeros((2, rows, cols))
+    aCbuf = []
     offs = int(1.5 * aPr)
 
+    # Each filter is a cosine-squared lobe at a different angular offset.
+    # NOTE: the ramp is NOT modulo-continuous at 0°/360° — there is a
+    # discontinuity in that direction that should behave like modulo wrapping.
     anglularFilt = []
-    for i in range(0,faPr):
-        lBuffer = np.zeros(angularMatr.shape, dtype='float64')
+    for i in range(0, faPr):
         aStep = halfPi * (i * (1 / aPr) - 2)
-        rRamp = np.cos(np.clip((angularMatr + aStep) * aPr, -halfPi, halfPi))**2
+        rRamp = np.cos(np.clip((angularMatr + aStep) * aPr, -halfPi, halfPi)) ** 2
         anglularFilt.append(rRamp)
 
+    # Log-scale radial filters: band i peaks at radialMatr = halfX^(i/(rO-1)).
+    # Using log scale means fine-scale bands cover proportionally narrower
+    # frequency intervals, matching the checker's harmonic spacing.
+    # Each radial × angular product is a directional conic bandpass (Gabor-like wedge).
     radialFilt = []
-    split = halfX
+    log_half = np.log(halfX)
     for i in range(0, rO):
-        for i in range(0, octaves + 1):
-            radialFilt.append(np.cos(np.clip(np.pi * (2 * radialMatr / step - i), -halfPi, halfPi)) ** 2)
-        split /= fH
+        log_r = np.where(radialMatr > 0, np.log(radialMatr), 0)
+        center = i * log_half / max(rO - 1, 1)
+        bw = log_half / max(rO - 1, 1)  # half-bandwidth in log-freq units
+        radialFilt.append(np.cos(np.clip((log_r - center) / bw * (np.pi / 2), -halfPi, halfPi)) ** 2)
+
+    # scaleFt[i]: center spatial frequency of band i in FFT pixels.
+    # Used to convert phase (radians) to displacement (pixels): d = phase / (2π·f/cols).
+    scaleFt_arr = [max(halfX ** (i / max(rO - 1, 1)), 1.0) for i in range(rO)]
 
     iwCf = 1
-    iwV = iwU = np.zeros(radialFilt[0].shape)
-    # iwV = np.zeros(radialFilt[0].shape)
-    iwC = []
+    iwV = np.zeros((rows, cols))
+    iwU = np.zeros((rows, cols))
+    iwC = []   # accumulated phase displacement per angular direction, in radians
+    ffA_work = ffA  # updated at each octave when img_a is provided
+
     for i in range(0, rO):
-        scaleFt = step * (i) + 1
+        scaleFt = scaleFt_arr[i]
+
+        # Image-level warp: apply current UV estimate to the original image and
+        # recompute its FFT. This cancels both the spatial shift AND the
+        # frequency-band migration caused by scaling (spectral energy redistribution).
+        # Pure filter-response warping (shiftMatrixInt) only cancels the spatial shift.
+        if i > 0 and img_a is not None:
+            disp_y = iwV * hh  # pixel displacement, V axis
+            disp_x = iwU * ww  # pixel displacement, U axis
+            src_y = np.clip((my - disp_y).ravel(), 0, rows - 1)
+            src_x = np.clip((mx - disp_x).ravel(), 0, cols - 1)
+            a_warped = ndimage.map_coordinates(
+                img_a.astype(float), [src_y, src_x], order=1, mode='nearest'
+            ).reshape(rows, cols)
+            ffA_work = fft.fftshift(fft.fft2(a_warped))
 
         avg = 0
-        for j in range(0,haPr):
+        for j in range(0, haPr):
             k = j + offs
             aStep = halfPi * (j * (1 / aPr) - 0.5)
             cc, ll, ss = sinCosLen(aStep, hh, ww)
 
+            # Directional bandpass: selects energy at octave i in angular direction j.
             pyrFilt = radialFilt[i] * anglularFilt[k]
 
             if np.any(pyrFilt > 0.1):
                 avg += 1
 
-                iwA = fft.ifft2(fft.ifftshift(ffA * pyrFilt))
+                # Inverse FFT back to spatial domain — gives a complex Gabor response
+                # where local phase encodes the spatial position of the filtered pattern.
+                iwA = fft.ifft2(fft.ifftshift(ffA_work * pyrFilt))
                 iwB = fft.ifft2(fft.ifftshift(ffB * pyrFilt))
+
                 if i > 0:
-                    iwAs = shiftMatrixInt(iwA, iwV, iwU, mx, my)
-                    oiwC = iwB * iwAs.conj()
-                    oiwCu = oiwC / (np.abs(oiwC))
+                    # ffA_work is already warped; measure residual phase directly.
+                    oiwC = iwB * iwA.conj()
+                    oiwCu = oiwC / (np.abs(oiwC) + 1e-12)
+                    # Unwrap phase and scale to displacement.
+                    # gradientfix suppresses gradient jumps > π to handle phase wrapping.
                     offsC = gradientfix(oiwCu, 1 / scaleFt, ss, cc, mx, my)
                     debug = np.angle(phaseShiftCompile(oiwCu, 1 / scaleFt))
-                    debugDeviation = np.abs(np.mean(debug / offsC) - 1)
-                    if  debugDeviation > 0.1:
+                    debugDeviation = np.abs(np.mean(debug / (offsC + 1e-12)) - 1)
+                    if debugDeviation > 0.1:
                         print(debugDeviation)
-                    #shift = np.round((np.mean(iwC[j]) * 2 - np.mean(offsC)) / np.pi)
+                    # Correct for global offset drift between running total and new residual.
                     shift = np.mean(iwC[j]) - np.mean(offsC)
                     offsCs = offsC + shift
-                    #delta = np.angle(np.exp( 1j * offsCs * scaleFt) * oiwCu.conj())
-                    iwC[j] +=  offsCs #+ delta / scaleFt # * np.pi / 2
+                    iwC[j] += offsCs
                 else:
-                    iwC.append(np.angle(iwB * iwA.conj() / np.abs(iwA*iwB)))
+                    # Baseline: capture the raw phase difference at the coarsest scale.
+                    # Division by magnitude normalises to unit circle before angle extraction.
+                    iwC.append(np.angle(iwB * iwA.conj() / (np.abs(iwA * iwB) + 1e-12)))
 
                 aC = iwC[j]
 
@@ -126,17 +166,18 @@ def pyramidFlow(ffA, ffB, angularMatr, radialMatr, my, mx):
                     niwV = aC * ss * ll
                     niwU = aC * -cc * ll
             else:
-                niwU = niwV = np.zeros(radialFilt[0].shape)
+                niwU = niwV = np.zeros((rows, cols))
                 if i < 1:
-                    iwC.append(np.zeros(radialFilt[0].shape, dtype="float64"))
+                    iwC.append(np.zeros((rows, cols), dtype="float64"))
 
-        aCbuf.append(np.moveaxis(np.dstack((niwV, niwU)), -1, -0))
+        aCbuf.append(np.moveaxis(np.dstack((niwV, niwU)), -1, 0))
 
         if avg > 0:
             iwV = niwV / avg
             iwU = niwU / avg
         iwCf /= 2
 
+    # Convert phase-radian displacement to pixel displacement.
     vuMap[0] = iwV * hh
     vuMap[1] = iwU * ww
 
@@ -382,7 +423,11 @@ def angleGradient(iwC, ss, cc, mx, my):
     return grad[0] * ss + grad[1] * cc
 
 def gradientfix(iwD, scale, ss, cc, mx, my):
-
+    # Unwrap the phase field and convert to displacement.
+    # Phase wrapping occurs when displacement exceeds half a spatial cycle (Δφ > π).
+    # Strategy: take the gradient, suppress large jumps (which are wraps), then cumsum.
+    # Three rotated probes (using otDeg = exp(i·2π/3)) ensure at least one is never
+    # near a ±π boundary, enabling reliable gradient selection.
     threshold =  np.pi*0.95
     dD = np.angle(iwD)
     if dD.max() < threshold and -dD.min() < threshold:
@@ -495,7 +540,7 @@ if __name__ == '__main__':
     octaves = 16
     fH = 2 #np.sqrt(2)
     #oZwt = np.pi * 0.66666
-    otDeg = np.array(-0.5 + 1j * np.sqrt(0.75)).max()
+    otDeg = np.array(-0.5 + 1j * np.sqrt(0.75)).max()  # exp(i·2π/3): 120° rotation for wrap disambiguation
     radialFilt = []
     split = halfX
     step = halfX / octaves
@@ -516,6 +561,7 @@ if __name__ == '__main__':
 
     ax2[0, 1].set_title("linear analysis 2")
 
+    # fftshift recenters the DC component so frequency-domain coordinates are symmetric.
     ffA = fft.fftshift(fft.fft2(a))
     ffB = fft.fftshift(fft.fft2(b))
 
@@ -595,6 +641,7 @@ if __name__ == '__main__':
         if i > 0:
             #iwEoff = np.exp(1j * (scaleFt[i]*sC[-1]))
 
+            # Pre-warp A by accumulated phase offset so finer band only sees the residual.
             niwA, mask = shiftMatrixA(iwA[i], sD[-1], rows, cols, np.pi - (sect / haPr) * np.pi, mx, my)
             iwA2.append(niwA)
 
@@ -833,11 +880,29 @@ if __name__ == '__main__':
 
     start = timer()
     print("Start: ...")
-    # vuMap, acBuf, pyrFilt = pyramidFlow(ffA, ffB, angleMatr, dist, my, mx)
-    # vuMap, acBuf, pyrFilt = pyramidFlow(ffA, ffB, angleMatr, dist, my, mx)
+    vuMap, acBuf, pyrFilt = pyramidFlow(ffA, ffB, angleMatr, dist, my, mx, img_a=a)
     print("... Stop.")
     end = timer()
     print(f"delta:{timedelta(seconds=end-start)}")
+
+    # Visualize the UV result: expected inverse-pyramid ramp pointing toward center.
+    vuMag = np.abs(vuMap[:, :, 1] + 1j * vuMap[:, :, 0])
+    ax2[1, 4].imshow(vuMag, cmap='hot')
+    ax2[1, 4].set_title("UV magnitude (px)")
+    nvec_q = 20
+    step_q = max(rows // nvec_q, cols // nvec_q)
+    vy_q, vx_q = np.mgrid[:rows:step_q, :cols:step_q]
+    u_q = vuMap[::step_q, ::step_q, 1]
+    v_q = vuMap[::step_q, ::step_q, 0]
+    ax2[1, 4].quiver(vx_q, vy_q, u_q, v_q, color='cyan', units='dots',
+                     angles='xy', scale_units='xy', scale=0.5, lw=1)
+    # 1D slice through center row — should be a linear ramp
+    ax2[0, 3].plot(vuMap[rows // 2, :, 1], label='U (horizontal slice)')
+    ax2[0, 3].plot(vuMap[:, cols // 2, 0], label='V (vertical slice)')
+    ax2[0, 3].axhline(0, color='k', lw=0.5)
+    ax2[0, 3].set_title("UV slices (expect linear ramp)")
+    ax2[0, 3].legend()
+    ax2[0, 3].grid()
     ax2[1, 3].set_title("filter sum")
 
 
