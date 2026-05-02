@@ -970,6 +970,8 @@ if __name__ == '__main__':
 
     ax2[1, 4].set_title("uv-vector map")
     ax2[1, 2].set_title("ifft-offset")
+    shape = iwA[0].shape
+    sF = np.ones(shape, dtype=complex)
 
     aiwC = np.zeros(iwC[0].shape, dtype="complex128")
     for i in range(0, min(14, rO)):
@@ -995,7 +997,14 @@ if __name__ == '__main__':
             #ax[2, col].imshow(np.angle(iwA[i] * iwF[i].conj()))
             #ax[3, col].imshow(np.angle(iwB[i] * iwF[i].conj()))
         #ax[row + 2, col].imshow(np.abs(fft.ifft2(fft.ifftshift(np.exp(1j * ((np.pi*np.sqrt(2)*256*(my*np.sin(np.pi/4)+mx*np.cos(np.pi/4)) / (rows))))*np.sum(np.stack(iwF)[0:i],axis=0)))))
-        ax[row + 2, col].imshow(np.angle(-iwA2[i])[:,0:127],np.angle(-iwB[i])[:,128:255])
+        if i > 0:
+            sF = iwA[i] / np.abs(iwA[i]) * sF.conj()
+        #else:
+            #sF = iwA[i] / np.abs(iwA[i])
+
+        ax[row + 2, col].imshow(np.angle(sF)) #iwA[max(i,1)]*iwA[max(i-1,1)].conj())) #ä[:,0:127],np.angle(iwB[max(i,1)])[:,128:255])
+
+
         #ax[row + 2, col].imshow(radialFilt[i+3] * anglularFilt[sect])
 
     # u_ = acBuf[i][1, ::step, ::step]
