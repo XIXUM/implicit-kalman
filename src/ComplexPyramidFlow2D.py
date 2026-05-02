@@ -43,7 +43,7 @@ def boundedLine(y1,x1,y2,x2, height, width):
 
     return rr, cc, val
 
-def pyramidFlow(ffA, ffB, angularMatr, radialMatr, my, mx, img_a=None):
+def pyramidFlow(ffA, ffB, angularMatr, radialMatr, my, mx, img_a=None, single_j=None):
     # Coarse-to-fine phase-based motion estimation.
     # ffA / ffB are fftshift'd 2D FFTs of images A and B.
     # angularMatr: per-pixel polar angle in frequency domain.
@@ -53,6 +53,11 @@ def pyramidFlow(ffA, ffB, angularMatr, radialMatr, my, mx, img_a=None):
     #        scaling correctly: warping only the Gabor response (shiftMatrixInt) cancels
     #        the translational phase shift but not the spectral energy redistribution
     #        caused by scaling. Warping the image before the FFT cancels both.
+    # single_j: when set to an integer in [0, haPr), restrict the inner angular
+    #           loop to that single direction. Used for debugging — isolates one
+    #           steerable-filter orientation to check boundary/alias behaviour
+    #           without cross-direction averaging masking the issue.
+    #           j=12 → aStep=π/2 → vertical axis (ss=1, cc=0, V only).
     # Returns a (H,W,2) UV displacement map in pixels.
     halfPi = np.pi / 2
     rows, cols = ffA.shape
@@ -101,7 +106,7 @@ def pyramidFlow(ffA, ffB, angularMatr, radialMatr, my, mx, img_a=None):
     iwCf = 1
     iwV = np.zeros((rows, cols))
     iwU = np.zeros((rows, cols))
-    iwC = []   # accumulated phase displacement per angular direction, in radians
+    iwC = {}   # accumulated phase displacement per angular direction j, in radians
     ffA_work = ffA  # updated at each octave when img_a is provided
 
     for i in range(0, rO):
@@ -114,15 +119,23 @@ def pyramidFlow(ffA, ffB, angularMatr, radialMatr, my, mx, img_a=None):
         if i > 0 and img_a is not None:
             disp_y = iwV * hh  # pixel displacement, V axis
             disp_x = iwU * ww  # pixel displacement, U axis
-            src_y = np.clip((my - disp_y).ravel(), 0, rows - 1)
-            src_x = np.clip((mx - disp_x).ravel(), 0, cols - 1)
+            src_y = (my - disp_y).ravel()
+            src_x = (mx - disp_x).ravel()
+            # Odd-reflect padding extrapolates linearly through the boundary,
+            # preserving feature gradients (e.g. checker phase ramps) so warps
+            # outside the original image domain do not introduce spectral
+            # discontinuities. Avoids the boundary aliasing that constant/clip
+            # boundary modes produce in the subsequent FFT.
+            pad = int(np.ceil(max(np.abs(disp_y).max(), np.abs(disp_x).max()))) + 2
+            img_padded = np.pad(img_a.astype(float), pad, mode='reflect', reflect_type='odd')
             a_warped = ndimage.map_coordinates(
-                img_a.astype(float), [src_y, src_x], order=1, mode='nearest'
+                img_padded, [src_y + pad, src_x + pad], order=1, mode='nearest'
             ).reshape(rows, cols)
             ffA_work = fft.fftshift(fft.fft2(a_warped))
 
         avg = 0
-        for j in range(0, haPr):
+        j_range = [single_j] if single_j is not None else range(0, haPr)
+        for j in j_range:
             k = j + offs
             aStep = halfPi * (j * (1 / aPr) - 0.5)
             cc, ll, ss = sinCosLen(aStep, hh, ww)
@@ -147,8 +160,8 @@ def pyramidFlow(ffA, ffB, angularMatr, radialMatr, my, mx, img_a=None):
                     offsC = gradientfix(oiwCu, 1 / scaleFt, ss, cc, mx, my)
                     debug = np.angle(phaseShiftCompile(oiwCu, 1 / scaleFt))
                     debugDeviation = np.abs(np.mean(debug / (offsC + 1e-12)) - 1)
-                    if debugDeviation > 0.1:
-                        print(debugDeviation)
+                    #if debugDeviation > 0.1:
+                        #print(debugDeviation)
                     # Correct for global offset drift between running total and new residual.
                     shift = np.mean(iwC[j]) - np.mean(offsC)
                     offsCs = offsC + shift
@@ -156,7 +169,7 @@ def pyramidFlow(ffA, ffB, angularMatr, radialMatr, my, mx, img_a=None):
                 else:
                     # Baseline: capture the raw phase difference at the coarsest scale.
                     # Division by magnitude normalises to unit circle before angle extraction.
-                    iwC.append(np.angle(iwB * iwA.conj() / (np.abs(iwA * iwB) + 1e-12)))
+                    iwC[j] = np.angle(iwB * iwA.conj() / (np.abs(iwA * iwB) + 1e-12))
 
                 aC = iwC[j]
 
@@ -581,6 +594,7 @@ if __name__ == '__main__':
     iwD = []
     iwC2 = []
     sD = []
+    sD_real = []  # real-valued cumulative displacement (px) per octave, for diagnostic
     #sC = []
 
     sE = []
@@ -708,6 +722,18 @@ if __name__ == '__main__':
         #sD.append(sumAngle2D(aiwD,ss,cs,my,mx))
         sD.append(np.angle(aiwD))
 
+        # Real-valued cumulative displacement (px). Each octave's residual
+        # iwD[-1] encodes the local phase shift at center frequency scaleFt[i];
+        # converting to pixel displacement and summing gives a directly
+        # interpretable linear ramp (no complex-phasor wrapping that turns
+        # the result into a Gabor-like envelope).
+        disp_inc = np.angle(iwD[-1]) * (rows / (2 * np.pi * scaleFt[i]))
+        if i == 0:
+            sD_disp = disp_inc
+        else:
+            sD_disp = sD_disp + disp_inc
+        sD_real.append(sD_disp.copy())
+
     ax2[0, 1].grid()
 
     show_angle = False
@@ -788,7 +814,11 @@ if __name__ == '__main__':
             ax1[row, col].plot(sumAngle((iwD[i]*iwE[2])[rr, cl]) - np.average(sumAngle((iwD[i]*iwE[2])[rr, cl])[127:129]) , label=f'8')
                                     #- np.average(np.angle(-iwD[i][127:129, 127]))
                                          #*np.exp(-1j * (np.pi * ((iwAe2[i] - iwBe2[i])/scaleFt[i]) * ((my * ss + mx * cs) / rows - 0.5))))[rr, cl]), label=f'8')
-            ax1[row, col].plot(sD[i][rr, cl],label=f'9')
+            ax1[row, col].plot(sD[i][rr, cl],label=f'9 (wrapped angle)')
+            # Real-valued cumulative displacement: should be a linear ramp,
+            # not a Gabor-like envelope. If 9b stays linear while 9 collapses,
+            # the issue is the multiplicative complex-phasor accumulation.
+            ax1[row, col].plot(sD_real[i][rr, cl], label='9b (cum disp px)')
 
             #ax1[row, col].plot(np.angle(iwE[2])[rr, cl], label=f'10')
 
@@ -876,11 +906,15 @@ if __name__ == '__main__':
     ax2[1, 0].imshow(sD[-1],vmin=0,vmax=1)
 
     start = timer()
-    print("Start: ...")
-    vuMap, acBuf, pyrFilt = pyramidFlow(ffA, ffB, angleMatr, dist, my, mx, img_a=a)
-    print("... Stop.")
+    #print("Start: ...")
+    # single_j=12 → aStep=π/2 → vertical-axis only (ss=1, cc=0).
+    # Restricts the steerable filter to one direction so we can see if the
+    # boundary/alias artefacts are in the per-direction phase unwrapping
+    # rather than masked by cross-direction averaging.
+    vuMap, acBuf, pyrFilt = pyramidFlow(ffA, ffB, angleMatr, dist, my, mx, img_a=a, single_j=12)
+    #print("... Stop.")
     end = timer()
-    print(f"delta:{timedelta(seconds=end-start)}")
+    #print(f"delta:{timedelta(seconds=end-start)}")
 
     # Visualize the UV result: expected inverse-pyramid ramp pointing toward center.
     vuMag = np.abs(vuMap[:, :, 1] + 1j * vuMap[:, :, 0])
@@ -891,8 +925,8 @@ if __name__ == '__main__':
     vy_q, vx_q = np.mgrid[:rows:step_q, :cols:step_q]
     u_q = vuMap[::step_q, ::step_q, 1]
     v_q = vuMap[::step_q, ::step_q, 0]
-    ax2[1, 4].quiver(vx_q, vy_q, u_q, v_q, color='cyan', units='dots',
-                     angles='xy', scale_units='xy', scale=0.5, lw=1)
+    #ax2[1, 4].quiver(vx_q, vy_q, u_q, v_q, color='cyan', units='dots',
+    #                 angles='xy', scale_units='xy', scale=0.5, lw=1)
     # 1D slice through center row — should be a linear ramp
     ax2[0, 3].plot(vuMap[rows // 2, :, 1], label='U (horizontal slice)')
     ax2[0, 3].plot(vuMap[:, cols // 2, 0], label='V (vertical slice)')
@@ -961,7 +995,7 @@ if __name__ == '__main__':
             #ax[2, col].imshow(np.angle(iwA[i] * iwF[i].conj()))
             #ax[3, col].imshow(np.angle(iwB[i] * iwF[i].conj()))
         #ax[row + 2, col].imshow(np.abs(fft.ifft2(fft.ifftshift(np.exp(1j * ((np.pi*np.sqrt(2)*256*(my*np.sin(np.pi/4)+mx*np.cos(np.pi/4)) / (rows))))*np.sum(np.stack(iwF)[0:i],axis=0)))))
-        ax[row + 2, col].imshow(np.c_[np.angle(-iwA2[i])[:,0:127],np.angle(-iwB[i])[:,128:255]])
+        ax[row + 2, col].imshow(np.angle(-iwA2[i])[:,0:127],np.angle(-iwB[i])[:,128:255])
         #ax[row + 2, col].imshow(radialFilt[i+3] * anglularFilt[sect])
 
     # u_ = acBuf[i][1, ::step, ::step]
@@ -971,7 +1005,7 @@ if __name__ == '__main__':
     # ax[row, col].imshow(np.abs(acBuf[i][1] * 1j * acBuf[i][0]))
 
         #ax[row, col].imshow(np.angle(iwA[i]))
-        #ax[row + 2, col].imshow(np.angle(iwB[i]))
+        #ax[row + 2, col] .imshow(np.angle(iwB[i]))
         #ax[row+2, col].imshow(np.angle(iwB[i]*iwA[i].conj()))
         #ax[row+2, col].imshow(np.angle(iwB[i]*(iwA[i]*sC[i-1]).conj()))
         #ax[row, col].imshow(np.dstack((ffA.real*radialFilt[i] * anglularFilt[sect],ffA.imag*radialFilt[i] * anglularFilt[sect], np.zeros(ffA.shape) )))
