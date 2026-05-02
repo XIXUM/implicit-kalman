@@ -3,8 +3,9 @@ from timeit import default_timer as timer
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-from scipy import fft, signal, ndimage, misc
+from scipy import fft, signal, ndimage
 from skimage import draw
+from skimage.transform import resize
 
 
 def centerLine(cy, cx, phi, shape):
@@ -184,11 +185,7 @@ def pyramidFlow(ffA, ffB, angularMatr, radialMatr, my, mx, img_a=None):
     return np.moveaxis(vuMap, 0, -1), aCbuf, anglularFilt
 
 def scale_array(x, new_size):
-    min_el = np.min(x)
-    max_el = np.max(x)
-    y = misc.imresize(x, new_size, mode='L', interp='nearest')
-    y = y / 255 * (max_el - min_el) + min_el
-    return y
+    return resize(x, new_size, order=0, preserve_range=True, anti_aliasing=False)
 
 def sumAngle2D(iwC):
     return np.cumsum(
