@@ -504,6 +504,44 @@ def conjProd(iwA, i):
 
     return initA
 
+
+def complexGradient2(cplx: np.ndarray):
+    """
+    Erwartet eine komplexe Matrix (dtype complex128 oder komplex).
+    Liefert (gy, gx, angle0, angle180, mask):
+      - gy, gx: kombinierte Gradienten (V, U) als float-Arrays
+      - angle0: np.angle(cplx)
+      - angle180: np.angle(-cplx)
+      - mask: bool-Array, True = benutze 180°-Gradienten
+
+    Maskenbedingung: np.abs(angle0) > np.pi (wie gewünscht: > ±180°).
+    Alle Operationen sind vektorisiert (keine Schleifen).
+    """
+    if not np.iscomplexobj(cplx):
+        raise TypeError("Input must be complex dtype")
+
+    # Winkel
+    angle0 = np.angle(cplx)
+    angle180 = np.angle(-cplx)
+
+    # Gradienten: returns [grad_y, grad_x]
+    g0_y, g0_x = np.gradient(angle0)
+    g180_y, g180_x = np.gradient(angle180)
+
+    # Bool-Maske: True -> verwende 180°-Gradient
+    mask = np.abs(angle0) > (np.pi // 2)
+
+    # Verschmelzen ohne Schleife
+    gv = np.where(mask, g180_y, g0_y)
+    gu = np.where(mask, g180_x, g0_x)
+
+    return np.stack((gu, gv), axis=0)
+
+# Beispiel:
+# gy, gx, a0, a180, mask = merge_gradients_by_mask(my_complex_array)
+
+
+
 if __name__ == '__main__':
 
 
@@ -512,7 +550,7 @@ if __name__ == '__main__':
     #a = np.asarray(Image.open("Images/xy_256x256.001.png").convert('L'))
     #b = np.asarray(Image.open("Images/xy_256x256.002.png").convert('L'))
     a = np.asarray(Image.open("relief0.png").convert('L'))
-    b = np.asarray(Image.open("relief0_sc.png").convert('L'))
+    b = np.asarray(Image.open("relief0_sc1.png").convert('L'))
 
     rows, cols = a.shape
 
@@ -772,12 +810,16 @@ if __name__ == '__main__':
     iwCf = 1
 
     sDf = []
-    sumC = []
+    sumC = np.zeros(iwC[0].shape, dtype=float)
+    diwA = np.ones(iwC[0].shape, dtype=complex)
+    diwA2 = np.ones(iwC[0].shape, dtype=complex)
+    diwB = np.ones(iwC[0].shape, dtype=complex)
+
+    iiE = [0, 0 , 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12]
+    piE = [1+0j, 1+0j, 1+0j, 1+0j, 1+0j, 1+0j, 1j, 1j, 1j, 1j, -1, -1, -1, -1, -1, -1, -1j, -1j, 1, 1, 1j, 1j, 1, 1, -1j, -1j, -1, -1, 1j, 1j, 1, 1]
 
     for i in range(0, min(min(len(iwA)-1, rO),15)):
 
-        #ax2[1, 3].plot(sumAngle(iwD[i][rr, cl]), label=f'{i}')
-        # ax2[0, 4].plot(sumAngle(naiwD[rr, cl]), label=f'{i}')
         ax2[0, 3].plot(sumAngle((iwA[i] * iwE[i].conj())[rr, cl]) / scaleFt[i], label=f'{i}a')
         ax2[1, 3].plot(sumAngle((iwB[i] * iwE[i].conj())[rr, cl]) / scaleFt[i], label=f'{i}b')
 
@@ -788,94 +830,45 @@ if __name__ == '__main__':
         #y = np.linspace(0, 255, 256)
 
 
-        a_sum = True
+        a_sum = False
         if a_sum == True:
 
-            # ax1[row, col].plot(np.max((np.log(np.abs(ffA.real) + 1) * iwF[i])[rr, :], axis=1)
-            #                    * np.sin(np.angle(np.average((ffA * iwF[i])[rr, :], axis = 1))), label='ffAr', color = (0.0, 0.0, 0.8))
-            # ax1[row, col].plot(np.max((np.log(np.abs(ffA.imag) + 1) * iwF[i])[rr, :], axis=1)
-            #                    * np.cos(np.angle(np.average((ffA * iwF[i])[rr, :], axis = 1))), label='ffAi', color = (0.5, 0.5, 1.0))
-            # ax1[row, col].plot(np.max((np.log(np.abs(ffB.real) + 1) * iwF[i])[rr, :], axis=1)
-            #                    * np.sin(np.angle(np.average((ffB * iwF[i])[rr, :], axis = 1))), label='ffBr', color = (0.8, 0.0, 0.0))
-            # ax1[row, col].plot(np.max((np.log(np.abs(ffB.imag) + 1) * iwF[i])[rr, :], axis=1)
-            #                    * np.cos(np.angle(np.average((ffB * iwF[i])[rr, :], axis = 1))), label='ffBi', color = (1.0, 0.5, 0.5))
-
-            #ax1[row, col].plot(np.angle((iwA[i]*sEc[i-1])[rr,cl]),label=f'1')
-            #ax1[row, col].plot(sumAngle((iwA[i] * np.exp(1j * (scaleFt[i] * sC[i - 1]))* iwE2[i].conj())[rr, cl]), label=f'1')
-            #ax1[row, col].plot(sumAngle(iwA[i][rr, cl]) - np.average(sumAngle(iwA[i][rr, cl])[127:129]),label=f'2')
-            #ax1[row, col].plot(sumAngle(iwB[i][rr, cl]) - np.average(sumAngle(iwB[i][rr, cl])[127:129]), label = f'3')
-            #ax1[row, col].plot(sumAngle(iwF[i][rr, cl]), label=f'4')
-            # ax1[row, col].plot(np.angle(iwA[i][rr, cl] * iwE[i][rr, cl].conj()),,label=f'3')
-        #ax1[row, col].plot(np.angle((iwA[i]*sEc[max(0,i-1)]*((iwA[max(0,i-1)]*sEc[max(0,i-2)])**2).conj()))[rr, cl], label=f'3')
-            # ax1[row, col].plot(np.angle(iwB[i][rr, cl] * iwE[i][rr, cl].conj()),label=f'4')
-        #ax1[row, col].plot(np.angle((iwB[i]*iwB[max(0,i-1)].conj()**2))[rr, cl], label=f'4')
-            #ax1[row, col].plot(sumAngle(iwA2[i][rr, cl] )- np.average(sumAngle(iwA2[i][rr, cl])[127:129]),label=f'5')
-            #ax1[row, col].plot(np.angle(np.power(iwB[i][rr, cl] * iwA2[i][rr, cl].conj(), 1 / (scaleFt[i]))), label=f'6')
             ax1[row, col].plot(sumAngle((iwD[i]*iwE[2])[rr, cl]) - np.average(sumAngle((iwD[i]*iwE[2])[rr, cl])[127:129]) , label=f'8')
-                                    #- np.average(np.angle(-iwD[i][127:129, 127]))
-                                         #*np.exp(-1j * (np.pi * ((iwAe2[i] - iwBe2[i])/scaleFt[i]) * ((my * ss + mx * cs) / rows - 0.5))))[rr, cl]), label=f'8')
-            ax1[row, col].plot(sD[i][rr, cl],label=f'9 (wrapped angle)')
-            # Real-valued cumulative displacement: should be a linear ramp,
-            # not a Gabor-like envelope. If 9b stays linear while 9 collapses,
-            # the issue is the multiplicative complex-phasor accumulation.
-            ax1[row, col].plot(sD_real[i][rr, cl], label='9b (cum disp px)')
 
-            #ax1[row, col].plot(np.angle(iwE[2])[rr, cl], label=f'10')
-
-            # ax1[row, col].plot(sumAngle(iwE2[i][rr, cl]), label=f'8')
-            #ax1[row, col].plot(np.angle((iwB[i] * iwE[iwBe[i]].conj())[rr, cl]), label=f'11')
-            #ax1[row, col].plot(np.angle(iwA[i][rr, cl]) + np.angle(iwB[i][rr, cl]), label=f'11')
-            if i > 0:
-                #if iwBe[i] == 0 :
-                ax1[row, col].plot(sumAngle((iwA[i]*iwE[2].conj())[rr, cl]) - np.average(sumAngle((iwA[i]*iwE[2].conj())[rr, cl])[127:129]), label=f'12')
-                #ax1[row, col].plot(sumAngle((iwA[i] )[rr, cl]) - np.average(sumAngle((iwA[i])[rr, cl])[127:129]), label=f'14')
-
-                    #ax1[row, col].plot(sumAngle((iwA[i])[rr, cl]), label=f'12')
-                    #ax1[row, col].plot(sumAngle((iwA[i] * iwE[i].conj())[rr, cl]), label=f'12')
-                #else:
-                #    ax1[row, col].plot(sumAngle((-(iwA[i]*conjProd(iwA,i).conj()))[rr, cl]), label=f'12')
-                    #ax1[row, col].plot(sumAngle((-iwA[i])[rr, cl]), label=f'12')
-                    #ax1[row, col].plot(sumAngle((-iwA[i] * iwE[i].conj())[rr, cl]), label=f'12')
-
-                #if iwAe[i] == 0:
-                #    ax1[row, col].plot(np.angle(iwB[i][rr, cl] * iwA[i][rr, cl].conj()), label=f'14')
-                #else:
-                #    ax1[row, col].plot(np.angle(iwB[i][rr, cl].conj() * -iwA[i][rr, cl]), label=f'14')
-
-                #if iwAe[i] == 0 and iwBe[i] == 0:
-                ax1[row, col].plot(sumAngle((iwB[i]*iwE[2].conj())[rr, cl]) - np.average(sumAngle((iwB[i]*iwE[2].conj())[rr, cl])[127:129]), label=f'13')
-                    #ax1[row, col].plot(sumAngle((iwB[i])[rr, cl]), label=f'13')
-                    #ax1[row, col].plot(sumAngle((iwB[i] * iwE[i].conj())[rr, cl]), label=f'13')
-                #else:
-                #    ax1[row, col].plot(sumAngle((-(iwB[i]*conjProd(iwB,i).conj()))[rr, cl]), label=f'13')
-                    #ax1[row, col].plot(sumAngle((-iwB[i])[rr, cl]), label=f'13')
-                    #ax1[row, col].plot(sumAngle((-iwB[i] * iwE[i].conj())[rr, cl]), label=f'13')
-                ax1[row, col].plot(sumAngle((iwA2[i]*iwE[2].conj())[rr, cl]) - np.average(sumAngle((iwA2[i]*iwE[2].conj())[rr, cl])[127:129]), label=f'15')
-
-            #ax1[row, col].plot(np.angle(iwE[i][rr, cl]), label=f'15')
-
-            #ax1[row, col].plot(np.angle(iwA2[i][rr, cl]), label=f'14')
-            #ax1[row, col].plot(sumAngle(iwC[i][rr, cl]*(iwC[max(0,i-1)][rr, cl]**2)),label=f'8')
-            #ax1[row, col].plot(sumAngle(np.power(iwD[i][rr, cl],1/scaleFt[i])),label=f'7')
-            #ax1[row, col].plot(sumAngle(iwE[i][rr, cl]),label=f'8')
-
-            #sDf.append(gradientfix(iwD[i], 1 / scaleFt[i], ss, cs, mx, my))
+            ax1[row, col].plot(sD[i][rr, cl],label=f'9')
+        #    if i > 0:
+         #       ax1[row, col].plot(sumAngle((iwA[i]*iwE[2].conj())[rr, cl]) - np.average(sumAngle((iwA[i]*iwE[2].conj())[rr, cl])[127:129]), label=f'12')
+          #      ax1[row, col].plot(sumAngle((iwB[i]*iwE[2].conj())[rr, cl]) - np.average(sumAngle((iwB[i]*iwE[2].conj())[rr, cl])[127:129]), label=f'13')
+          #      ax1[row, col].plot(sumAngle((iwA2[i]*iwE[2].conj())[rr, cl]) - np.average(sumAngle((iwA2[i]*iwE[2].conj())[rr, cl])[127:129]), label=f'15')
 
         else:
-            #ax1[row, col].plot(np.pi * 2 * i + np.angle(aiwC[rr, cl]), label=f'2')
-            #ax1[row, col].plot(np.pi * 2 * i + np.angle(iwA[i][rr, cl] * iwE[rr, cl].conj()), label=f'3')
-            #ax1[row, col].plot(np.pi * 2 * i + np.angle(iwB[i][rr, cl] * iwE[rr, cl].conj()), label=f'4')
-            #ax1[row, col].plot(np.pi * 2 * i + np.angle(iwA2[i][rr, cl] * iwE[rr, cl].conj()), label=f'5')
-            ax1[row, col].plot(np.pi * 2 * 1 + np.angle(iwC[i][rr, cl]), label=f'6')
 
-            ax1[row, col].plot(np.pi * 2 * 1 + np.angle(iwD[i][rr, cl]), label=f'7')
-            ax1[row, col].plot(np.pi * 2 * i + np.angle(iwE[i][rr, cl]), label=f'8')
-            #ax1[row, col].plot(np.pi * 2 * 2 + np.angle(sC[i][rr, cl]), label=f'9')
-            ax1[row, col].plot(np.pi * 2 * 2 + np.angle(sD[i][rr, cl]), label=f'10')
-            ax1[row, col].plot(np.pi * 2 * 1 + np.angle((sEc[i])[rr, cl]), label=f'11')
-            ax1[row, col].plot(np.pi * 2 * 1 + np.angle((sE[i])[rr, cl]), label=f'12')
-            ax1[row, col].plot(np.pi * 2 * 1 + np.angle(
-                (iwC[i - 1] * iwC[i])[rr, cl]), label=f'13')
+            # ax1[row, col].plot(np.pi * 2 * 1 + np.angle(iwC[i][rr, cl]), label=f'6')
+            # ax1[row, col].plot(np.pi * 2 * 1 + np.angle(iwD[i][rr, cl]), label=f'7')
+            # ax1[row, col].plot(np.pi * 2 * i + np.angle(iwE[i][rr, cl]), label=f'8')
+            # ax1[row, col].plot(np.pi * 2 * 2 + np.angle(sD[i][rr, cl]), label=f'10')
+            # ax1[row, col].plot(np.pi * 2 * 1 + np.angle((sEc[i])[rr, cl]), label=f'11')
+            # ax1[row, col].plot(np.pi * 2 * 1 + np.angle((sE[i])[rr, cl]), label=f'12')
+            # diwE =  iwE[1] #iwE[max((i+2) // 4, 0)] / np.abs(iwE[max((i+2) // 4, 0)])
+            diwE = iwE[iiE[i]] * piE[i] #* iwE[iiE[i]].conj()
+            diwA *= (iwA[max(i, 1)] / np.abs(iwA[max(i, 1)])).conj() * diwE
+            diwA2 *= (iwA2[max(i, 1)] / np.abs(iwA2[max(i, 1)])).conj() * diwE
+            diwB *= (iwB[max(i, 1)] / np.abs(iwB[max(i, 1)])).conj() * diwE
+            diwC = diwA * diwB.conj()
+            sumC += np.angle(diwC) / scaleFt[i]
+
+            #ax1[row, col].plot(np.angle((iwA[max(i, 1)])[rr, cl]), label=f'12')
+            #ax1[row, col].plot(np.angle((iwB[max(i, 1)])[rr, cl]), label=f'13')
+
+            ax1[row, col].plot(np.angle((diwA)[rr, cl]), label=f'14')
+            ax1[row, col].plot(np.angle((diwB)[rr, cl]), label=f'15')
+            ax1[row, col].plot(np.angle((diwA2)[rr, cl]), label=f'18')
+            #ax1[row, col].plot(np.angle((diwC)[rr, cl]), label=f'13')
+            ax1[row, col].plot(np.angle((diwE)[rr, cl]), label=f'16')
+            #ax1[row, col].plot(sumC[rr, cl], label=f'17')
+
+            #ax1[row, col].plot(np.angle(
+            #    (iwC[i - 1] * iwC[i])[rr, cl]), label=f'13')
 
 
         ax1[row, col].legend()
@@ -885,7 +878,7 @@ if __name__ == '__main__':
 
     for i in range(0, rO):
         ax2[0, 0].plot(sD[i][rr,cl], label=f'sc({i})')
-        #ax2[0, 0].plot(np.angle(sC[i][rr, cl]), label=f'sc({i})')
+
 
     ax2[0, 0].legend()
     ax2[0, 0].grid()
@@ -951,86 +944,36 @@ if __name__ == '__main__':
     step = max(rows // nvec, cols // nvec)
 
     vy, vx = np.mgrid[:rows:step, :cols:step]
-  #  u_ = vuMap[::step, ::step, 1]
 
-  #  v_ = vuMap[::step, ::step, 0]
-
- #   vuMag = np.abs(vuMap[:, :, 1] + 1j * vuMap[:, :, 0])
-
- #   ax2[1, 4].imshow(vuMag)
- #   ax2[1, 4].quiver(vx, vy, u_, v_, color='r', units='dots',
- #             angles='xy', scale_units='xy', lw=3)
-
-  #  rr, cl = centerLine(128, 128, np.pi / 4, ffA.shape)
-    #ax2[1, 4].plot(cl, rr, 'r-')
-#    for i in range(0, min(10, rO)):
- #       vuM = np.abs(acBuf[i][0] + 1j * acBuf[i][1])
-  #      ax2[0, 1].plot(vuM[vuM.shape[0] - rr - 1, vuM.shape[1] - cl - 1])
-   #     ax2[0, 1].plot(vuM[128])
 
     ax2[1, 4].set_title("uv-vector map")
     ax2[1, 2].set_title("ifft-offset")
     shape = iwA[0].shape
-    sF = np.ones(shape, dtype=complex)
+    # sF = np.ones(shape, dtype=complex)
 
     aiwC = np.zeros(iwC[0].shape, dtype="complex128")
     for i in range(0, min(14, rO)):
         row = (i) // 7
         col = (i) % 7
 
-        ax[row, col].imshow(sD[i]) #, vmin=-np.pi, vmax=np.pi)
-
-        #ax[row+2, col].imshow(np.angle(iwA[i]) + np.angle(iwB[i]))
-        #ax[row + 2, col].imshow(np.angle(iwB[i]) + np.angle(iwA[i].conj()))
-
-        #ax[row+2, col].imshow(iwF[i])
-
-        #if i < 7:
-        #     ax[2, col].imshow(np.angle(iwA[i].conj()*iwB[i]))
-        #ax[row+2, col].imshow(np.angle(iwB[i])+np.angle(iwA[i]))
-            #ax[2, col].imshow(np.angle((iwA[i]*((iwA[max(0,i-1)]*iwC[max(0,i-1)])**2).conj())), vmin=-np.pi, vmax=np.pi)
-            #ax[3, col].imshow(np.angle((iwB[i]*((iwB[max(0,i-1)])**2).conj())), vmin=-np.pi, vmax=np.pi)
-            #ax[2, col].imshow(np.log(np.abs(ffA.conj()*ffB)))#*iwF[i])
-
-            #ax[3, col].imshow(np.angle(ffA.conj()*ffB))#*iwF[i])
-
-            #ax[2, col].imshow(np.angle(iwA[i] * iwF[i].conj()))
-            #ax[3, col].imshow(np.angle(iwB[i] * iwF[i].conj()))
-        #ax[row + 2, col].imshow(np.abs(fft.ifft2(fft.ifftshift(np.exp(1j * ((np.pi*np.sqrt(2)*256*(my*np.sin(np.pi/4)+mx*np.cos(np.pi/4)) / (rows))))*np.sum(np.stack(iwF)[0:i],axis=0)))))
-        if i > 0:
-            sF = iwA[i] / np.abs(iwA[i]) * sF.conj()
-        #else:
-            #sF = iwA[i] / np.abs(iwA[i])
-
-        ax[row + 2, col].imshow(np.angle(sF)) #iwA[max(i,1)]*iwA[max(i-1,1)].conj())) #ä[:,0:127],np.angle(iwB[max(i,1)])[:,128:255])
+        giwA = complexGradient2(iwA2[i])
+        grMiwA = np.sqrt(giwA[0]**2 + giwA[1]**2)
+        giwB = complexGradient2(iwB[i])
+        grMiwB = np.sqrt(giwB[0]**2 + giwB[1]**2)
+        ax[row, col].imshow(grMiwB-grMiwA)
+        #ax[row, col].imshow(np.hstack((grMiwA[:, :127], grMiwB[:, 128:])))
+        #ax[row, col].imshow(sD[i]) #, vmin=-np.pi, vmax=np.pi)
 
 
-        #ax[row + 2, col].imshow(radialFilt[i+3] * anglularFilt[sect])
+        diwA = iwA[max(i,1)]*iwA[max(i-1,1)].conj()
+        diwB = iwB[max(i,1)]*iwB[max(i-1,1)].conj()
+        diwC = diwA * diwB.conj()
+        diwC += (diwC == 0) * 1 # nullsafe
 
-    # u_ = acBuf[i][1, ::step, ::step]
-    # v_ = acBuf[i][0, ::step, ::step]
-    #ax[row, col].quiver(vx, vy, u_, v_, color='r', units='dots',
-        #        angles='xy', scale_units='xy', lw=3)
-    # ax[row, col].imshow(np.abs(acBuf[i][1] * 1j * acBuf[i][0]))
+        ax[row + 2, col].imshow(np.hstack((np.angle(diwA)[:,:85], np.angle(diwC)[:,86:169],np.angle(diwB)[:,170:]))) #[:,0:127],np.angle(iwB[max(i,1)])[:,128:255])
 
-        #ax[row, col].imshow(np.angle(iwA[i]))
-        #ax[row + 2, col] .imshow(np.angle(iwB[i]))
-        #ax[row+2, col].imshow(np.angle(iwB[i]*iwA[i].conj()))
-        #ax[row+2, col].imshow(np.angle(iwB[i]*(iwA[i]*sC[i-1]).conj()))
-        #ax[row, col].imshow(np.dstack((ffA.real*radialFilt[i] * anglularFilt[sect],ffA.imag*radialFilt[i] * anglularFilt[sect], np.zeros(ffA.shape) )))
-        # if i > 0:
-        #     ax[row + 2, col].imshow(np.angle(iwC[i] * sEc[i-1].conj()))
-        # else:
-        #ax[row + 2, col].imshow(np.angle(iwC[i]), vmin=-np.pi, vmax=np.pi)
-        #ax[row + 2, col].imshow(np.angle(iwD[i]), vmin=-np.pi, vmax=np.pi)
-        #ax[row + 2, col].imshow(sDf[i], vmin=-np.pi, vmax=np.pi)
-        #ax[row + 2, col].imshow(np.dstack((ffB.real*radialFilt[i] * anglularFilt[sect],ffB.imag*radialFilt[i] * anglularFilt[sect],np.zeros(ffA.shape))))
-        #ax[row + 2, col].imshow(radialFilt[i] * anglularFilt[sect])
-        #if i > 1:
-        #    ax[row+2, col].imshow(np.angle(((iwB[i]*iwA[i].conj())/np.abs(iwB[i]*iwA[i]))*np.power(sC[i-1].conj(),(i-1)**2)), vmin=-np.pi, vmax=np.pi)
-        #else:
-        #    ax[row + 2, col].imshow(np.angle(iwB[i]*iwA[i].conj()), vmin=-np.pi, vmax=np.pi)
-        #ax[row + 2, col].imshow(sC[i])
+
+
     plt.show()
     print("pass00")
     plt.waitforbuttonpress()
