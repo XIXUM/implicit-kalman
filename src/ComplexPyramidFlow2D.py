@@ -543,6 +543,15 @@ def complexGradient2(cplx: np.ndarray):
 # gy, gx, a0, a180, mask = merge_gradients_by_mask(my_complex_array)
 
 
+def flip_saw(cV):
+    cVa = np.angle(cV)
+    gcVa = np.gradient(cVa)
+    grMcVa = np.sqrt(gcVa[0] ** 2 + gcVa[1] ** 2)
+    if (grMcVa.max() - grMcVa.min() > 1):
+        # rotate by 2 pi
+        cV = cV * 1j ** 2
+
+    return cV
 
 if __name__ == '__main__':
 
@@ -837,7 +846,10 @@ if __name__ == '__main__':
         col = i % 5
 
         #y = np.linspace(0, 255, 256)
-
+        if i == 0:
+            iwC2 = iwC[i]
+        if np.abs(iwC2).max() < 1:
+            iwC2 = np.ones(iwC[i].shape, dtype=complex)
 
         a_sum = False
         if a_sum == True:
@@ -863,20 +875,23 @@ if __name__ == '__main__':
             diwA *= (iwA[max(i, 1)] / np.abs(iwA[max(i, 1)])).conj() * diwE
             diwA2 *= (iwA2[max(i, 1)] / np.abs(iwA2[max(i, 1)])).conj() * diwE
             diwB *= (iwB[max(i, 1)] / np.abs(iwB[max(i, 1)])).conj() * diwE
-            diwC = diwA * diwB.conj()
+            diwC = diwA2 * diwB.conj()
 
 
-            diwCa = np.angle(diwC)
-            cycle = 0
-            while ((diwCa.max() >= np.pi*0.95) or (diwCa.min() <= -np.pi*0.95)) and cycle < 2:
-                # rotate by 2 pi
-                diwC = diwC*1j
-                diwCa = np.angle(diwC)
-                sumC += np.angle(diwC) / scaleFt[i]
-                cycle += 1
+
+            iwA3 = iwA[max(i, 0)] * iwC2
+            iwC2 = iwA3 * iwB[max(i, 0)].conj()
+
+            iwC[i] = flip_saw(iwC[i])
+            iwC2 = flip_saw(iwC2)
+
+            sumC += np.angle(iwC2) / scaleFt[i]
 
             ax1[row, col].plot(np.angle((iwA[max(i, 0)])[rr, cl]), label=f'12')
             ax1[row, col].plot(np.angle((iwB[max(i, 0)])[rr, cl]), label=f'13')
+            ax1[row, col].plot(np.angle((iwA3)[rr, cl]), label=f'14')
+            ax1[row, col].plot(np.angle((iwC2)[rr, cl]), label=f'15')
+
             giwA = complexGradient2(iwA[i])
             grMiwA = np.sqrt(giwA[0] ** 2 + giwA[1] ** 2)
             giwB = complexGradient2(iwB[i])
@@ -888,9 +903,10 @@ if __name__ == '__main__':
             #ax1[row, col].plot(np.angle((diwA)[rr, cl]), label=f'14')
             #ax1[row, col].plot(np.angle((diwB)[rr, cl]), label=f'15')
             #ax1[row, col].plot(np.angle((diwA2)[rr, cl]), label=f'18')
-            ax1[row, col].plot(5+np.angle((diwC)[rr, cl]), label=f'13')
-            #ax1[row, col].plot(np.angle((diwE)[rr, cl]), label=f'16')
+            ax1[row, col].plot(5+np.angle((iwC[i])[rr, cl]), label=f'16')
+            #ax1[row, col].plot(8+np.angle((iwD[i])[rr, cl]), label=f'16')
             ax1[row, col].plot(sumC[rr, cl], label=f'19')
+
 
             ax1[row, col].plot((grMiwA * iwA[0].shape[0])[rr, cl], label=f'17')
             ax1[row, col].plot((grMiwB * iwB[0].shape[0])[rr, cl], label=f'18')
