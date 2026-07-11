@@ -664,7 +664,8 @@ if __name__ == '__main__':
 
         jp = sect
         jn = sect
-        filter =  np.sum(np.stack(radialFilt)[0:i],axis=0) * anglularFilt[sect]
+        #filter =  np.sum(np.stack(radialFilt)[0:i],axis=0) * anglularFilt[sect]
+        filter = radialFilt[i]* anglularFilt[sect]
         if radialFilt[i].max() > 0.1:
             if filter.max() < 0.1:
                 fp = fn = filter
@@ -857,18 +858,25 @@ if __name__ == '__main__':
             diwC = diwA * diwB.conj()
             sumC += np.angle(diwC) / scaleFt[i]
 
-            #ax1[row, col].plot(np.angle((iwA[max(i, 1)])[rr, cl]), label=f'12')
-            #ax1[row, col].plot(np.angle((iwB[max(i, 1)])[rr, cl]), label=f'13')
+            ax1[row, col].plot(np.angle((iwA[max(i, 0)])[rr, cl]), label=f'12')
+            ax1[row, col].plot(np.angle((iwB[max(i, 0)])[rr, cl]), label=f'13')
+            giwA = complexGradient2(iwA[i])
+            grMiwA = np.sqrt(giwA[0] ** 2 + giwA[1] ** 2)
+            giwB = complexGradient2(iwB[i])
+            grMiwB = np.sqrt(giwB[0] ** 2 + giwB[1] ** 2)
 
-            ax1[row, col].plot(np.angle((diwA)[rr, cl]), label=f'14')
-            ax1[row, col].plot(np.angle((diwB)[rr, cl]), label=f'15')
-            ax1[row, col].plot(np.angle((diwA2)[rr, cl]), label=f'18')
+
+
+
+            #ax1[row, col].plot(np.angle((diwA)[rr, cl]), label=f'14')
+            #ax1[row, col].plot(np.angle((diwB)[rr, cl]), label=f'15')
+            #ax1[row, col].plot(np.angle((diwA2)[rr, cl]), label=f'18')
             #ax1[row, col].plot(np.angle((diwC)[rr, cl]), label=f'13')
-            ax1[row, col].plot(np.angle((diwE)[rr, cl]), label=f'16')
+            #ax1[row, col].plot(np.angle((diwE)[rr, cl]), label=f'16')
             #ax1[row, col].plot(sumC[rr, cl], label=f'17')
 
-            #ax1[row, col].plot(np.angle(
-            #    (iwC[i - 1] * iwC[i])[rr, cl]), label=f'13')
+            ax1[row, col].plot((grMiwA * iwA[0].shape[0])[rr, cl], label=f'17')
+            ax1[row, col].plot((grMiwB * iwB[0].shape[0])[rr, cl], label=f'18')
 
 
         ax1[row, col].legend()
@@ -970,7 +978,7 @@ if __name__ == '__main__':
         diwC = diwA * diwB.conj()
         diwC += (diwC == 0) * 1 # nullsafe
 
-        ax[row + 2, col].imshow(np.hstack((np.angle(diwA)[:,:85], np.angle(diwC)[:,86:169],np.angle(diwB)[:,170:]))) #[:,0:127],np.angle(iwB[max(i,1)])[:,128:255])
+        ax[row + 2, col].imshow(np.hstack((np.angle(iwA[i])[:,:85], np.angle(iwC[i])[:,86:169],np.angle(iwB[i])[:,170:]))) #[:,0:127],np.angle(iwB[max(i,1)])[:,128:255])
 
 
 
