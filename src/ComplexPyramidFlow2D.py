@@ -864,7 +864,16 @@ if __name__ == '__main__':
             diwA2 *= (iwA2[max(i, 1)] / np.abs(iwA2[max(i, 1)])).conj() * diwE
             diwB *= (iwB[max(i, 1)] / np.abs(iwB[max(i, 1)])).conj() * diwE
             diwC = diwA * diwB.conj()
-            sumC += np.angle(diwC) / scaleFt[i]
+
+
+            diwCa = np.angle(diwC)
+            cycle = 0
+            while ((diwCa.max() >= np.pi*0.95) or (diwCa.min() <= -np.pi*0.95)) and cycle < 2:
+                # rotate by 2 pi
+                diwC = diwC*1j
+                diwCa = np.angle(diwC)
+                sumC += np.angle(diwC) / scaleFt[i]
+                cycle += 1
 
             ax1[row, col].plot(np.angle((iwA[max(i, 0)])[rr, cl]), label=f'12')
             ax1[row, col].plot(np.angle((iwB[max(i, 0)])[rr, cl]), label=f'13')
@@ -879,9 +888,9 @@ if __name__ == '__main__':
             #ax1[row, col].plot(np.angle((diwA)[rr, cl]), label=f'14')
             #ax1[row, col].plot(np.angle((diwB)[rr, cl]), label=f'15')
             #ax1[row, col].plot(np.angle((diwA2)[rr, cl]), label=f'18')
-            #ax1[row, col].plot(np.angle((diwC)[rr, cl]), label=f'13')
+            ax1[row, col].plot(5+np.angle((diwC)[rr, cl]), label=f'13')
             #ax1[row, col].plot(np.angle((diwE)[rr, cl]), label=f'16')
-            #ax1[row, col].plot(sumC[rr, cl], label=f'17')
+            ax1[row, col].plot(sumC[rr, cl], label=f'19')
 
             ax1[row, col].plot((grMiwA * iwA[0].shape[0])[rr, cl], label=f'17')
             ax1[row, col].plot((grMiwB * iwB[0].shape[0])[rr, cl], label=f'18')
@@ -967,6 +976,7 @@ if __name__ == '__main__':
     # sF = np.ones(shape, dtype=complex)
 
     aiwC = np.zeros(iwC[0].shape, dtype="complex128")
+    sumC = np.zeros(iwC[0].shape, dtype=float)
     for i in range(0, min(14, rO)):
         row = (i) // 7
         col = (i) % 7
@@ -982,11 +992,17 @@ if __name__ == '__main__':
 
         diwA = iwA[max(i,1)]*iwA[max(i-1,1)].conj()
         diwB = iwB[max(i,1)]*iwB[max(i-1,1)].conj()
-        diwC = diwA * diwB.conj()
+        diwC = (diwA * diwB.conj()) / np.abs(diwA * diwB.conj())
         diwC += (diwC == 0) * 1 # nullsafe
 
-        ax[row + 2, col].imshow(np.hstack((np.angle(iwA[i])[:,:85], np.angle(iwC[i])[:,86:169],np.angle(iwB[i])[:,170:]))) #[:,0:127],np.angle(iwB[max(i,1)])[:,128:255])
+        diwCa = np.angle(diwC)
+        if (diwCa.max() >= np.pi * 0.95) or (diwCa.min() <= -np.pi * 0.95):
+            # rotate by 2 pi
+            diwC = diwC * 1j ** 2
+            sumC += np.angle(diwC) / scaleFt[i]
 
+        ax[row + 2, col].imshow(np.hstack((np.angle(iwA[i])[:,:85], np.angle(iwC[i])[:,86:169],np.angle(iwB[i])[:,170:]))) #[:,0:127],np.angle(iwB[max(i,1)])[:,128:255])
+        ax[row + 2, col].imshow(np.hstack((np.angle(diwC)[:, :127], sumC[:, 128:255])))
 
 
     plt.show()
