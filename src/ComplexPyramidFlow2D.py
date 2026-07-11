@@ -94,7 +94,9 @@ def pyramidFlow(ffA, ffB, angularMatr, radialMatr, my, mx, img_a=None, single_j=
     radialFilt = []
     log_half = np.log(halfX)
     for i in range(0, rO):
-        log_r = np.where(radialMatr > 0, np.log(radialMatr), 0)
+        # Guard log against radialMatr == 0 at the FFT center: feed 1 (log 1 = 0)
+        # instead of 0 so np.log never sees a zero and emits no divide-by-zero warning.
+        log_r = np.log(np.where(radialMatr > 0, radialMatr, 1))
         center = i * log_half / max(rO - 1, 1)
         bw = log_half / max(rO - 1, 1)  # half-bandwidth in log-freq units
         radialFilt.append(np.cos(np.clip((log_r - center) / bw * (np.pi / 2), -halfPi, halfPi)) ** 2)
@@ -596,9 +598,13 @@ if __name__ == '__main__':
 
 
 
+    # log(dist) is undefined at the FFT center (dist == 0). Feed 1 there (log 1 = 0)
+    # so no divide-by-zero warning fires; the np.maximum with (dist > 0) already
+    # forces the center bin to 0, so this leaves the result unchanged.
+    log_dist = np.log(np.where(dist > 0, dist, 1))
     for i in range(0,octaves+1):
         #radialFilt.append(np.cos(np.clip(np.pi * 2 * (dist / step - i), -halfPi, halfPi))**2)
-        radialFilt.append(np.cos(np.clip(np.maximum((np.log(dist) * octaves) / np.log(cols/2),
+        radialFilt.append(np.cos(np.clip(np.maximum((log_dist * octaves) / np.log(cols/2),
                                                     (dist > 0)) - i, -1, 1) * np.pi * .5) ** 2)
         scaleFt.append(step * (i) + 1)
         ax2[0, 4].plot(radialFilt[-1][128,:], label=f"{i}")
@@ -788,8 +794,10 @@ if __name__ == '__main__':
     else:
         #ax2[0, 1].plot(np.max((np.log(np.abs(ffA) + 1) * anglularFilt[sect])[rr, :], axis=1), label='ffAr',color=(0.0, 0.0, 0.8))
         #ax2[0, 1].plot(np.max((np.log(np.abs(ffB) + 1) * anglularFilt[sect])[rr, :], axis=1), label='ffBr',color=(0.8, 0.0, 0.0))
-        ax2[0, 1].plot(np.log(np.max(ffA[rr, 120:136], axis=1) + 1), label='ffA')
-        ax2[0, 1].plot(np.log(np.max(ffB[rr, 120:136], axis=1) + 1), label='ffB')
+        # ffA/ffB are complex FFTs; matplotlib plots the real part. Take .real
+        # explicitly so the intent is clear and no ComplexWarning is raised.
+        ax2[0, 1].plot(np.log(np.max(ffA[rr, 120:136], axis=1) + 1).real, label='ffA')
+        ax2[0, 1].plot(np.log(np.max(ffB[rr, 120:136], axis=1) + 1).real, label='ffB')
 
     ax2[1, 1].plot(np.max((np.log(np.abs((ffB*ffA.conj()).real) + 1) * anglularFilt[sect])[rr, :], axis=1)
                    * np.sin(np.angle(np.average(((ffB*ffA.conj()) * anglularFilt[sect])[rr, :], axis = 1))), label='ffAr', color = (0.0, 0.0, 0.8))
@@ -897,7 +905,7 @@ if __name__ == '__main__':
     ax2[0, 2].set_title("fft - imageB")
 
 
-    ax2[1, 0].legend()
+    # ax2[1, 0] holds an imshow (sD[-1]) with no labeled line artists — no legend.
     ax2[1, 0].grid()
 
     ax2[1, 1].set_title("phase ImageB")
@@ -945,7 +953,6 @@ if __name__ == '__main__':
     ax2[0, 4].set_title("imageB")
 
 
-    ax2[1, 0].legend()
     ax2[1, 0].grid()
 
     nvec = 20
