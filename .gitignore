@@ -161,3 +161,7 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 .idea/
+
+# generated benchmark output figures
+src/phaseflow_result.png
+src/mpme_result.png
