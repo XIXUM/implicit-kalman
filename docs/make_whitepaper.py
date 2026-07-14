@@ -122,6 +122,43 @@ def table(fig, y, rows, col_x, width_box=(0.13, 0.87), size=9.5):
     return y
 
 
+def nlines(text, width):
+    """Number of wrapped lines a paragraph block will occupy."""
+    return sum(max(1, len(textwrap.wrap(p, width=width))) for p in text.split("\n"))
+
+
+def note_box(fig, y, label, text, width=92, size=8.5, lh=0.0155):
+    """A labelled tint box sized to exactly contain its wrapped text. Returns new y."""
+    n = nlines(text, width)
+    h = 0.015 + 0.006 + n * lh + 0.012
+    fig.add_artist(plt.Rectangle((0.09, y - h), 0.82, h, facecolor="#eef4fa",
+                   edgecolor=LINE, transform=fig.transFigure, zorder=0))
+    fig.text(0.105, y - 0.013, label, fontsize=7.5, family=MONO, color=ACCENT,
+             weight="bold", va="top", zorder=1)
+    ty = y - 0.013 - 0.018
+    for para in text.split("\n"):
+        for ln in textwrap.wrap(para, width=width):
+            fig.text(0.105, ty, ln, fontsize=size, family=SERIF, color="#243542",
+                     va="top", zorder=1)
+            ty -= lh
+    return y - h
+
+
+def info_box(fig, y, cells):
+    """A 2-column label/value metadata box sized to its rows. Returns new y."""
+    rows = (len(cells) + 1) // 2
+    h = 0.020 + rows * 0.032 + 0.008
+    fig.add_artist(plt.Rectangle((0.09, y - h), 0.82, h, facecolor="#f4f6f9",
+                   edgecolor=LINE, transform=fig.transFigure, zorder=0))
+    for i, (lab, val) in enumerate(cells):
+        cx = 0.11 + (i % 2) * 0.41
+        cy = y - 0.020 - (i // 2) * 0.032
+        fig.text(cx, cy, lab, fontsize=6.8, family=MONO, color=ACCENT, weight="bold",
+                 va="top", zorder=1)
+        fig.text(cx, cy - 0.013, val, fontsize=9, family=SERIF, color=INK, va="top", zorder=1)
+    return y - h
+
+
 def timeline(fig, ly):
     """A horizontal milestone timeline to anchor the Related Work page."""
     fig.text(0.09, ly + 0.045, "TIMELINE", fontsize=8, family=MONO, color=MUTE, weight="bold")
@@ -155,13 +192,13 @@ def build():
                  "and blind at depth.", fontsize=12, color="#e6f0fa", family=SERIF)
 
         yb = image(fig, HERO, 0.07, 0.825, 0.86)
-        caption(fig, yb - 0.006,
+        y = caption(fig, yb - 0.012,
                 "Depth reconstructed from each method's optical flow under a perspective Z-dolly. "
                 "Ground truth is crisp; every phase-based method — including the affine state of "
                 "the art — blurs, frays, or destroys the depth boundary. That boundary is what 3D "
                 "reconstruction is made of.")
 
-        y = yb - 0.05
+        y -= 0.020
         fig.text(0.09, y, "ABSTRACT", fontsize=8, family=MONO, color=ACCENT, weight="bold")
         y -= 0.024
         y = body(fig, y,
@@ -175,29 +212,21 @@ def build():
             "every method blurs or destroys the depth boundary reconstruction depends on. The "
             "ceiling is not motion size — it is the affine assumption.", lh=0.0178, width=94)
 
-        # key findings
-        ky = 0.415
-        fig.text(0.09, ky, "KEY FINDINGS", fontsize=8, family=MONO, color=ACCENT, weight="bold")
-        ky -= 0.026
-        bullets(fig, ky, [
+        y -= 0.016
+        fig.text(0.09, y, "KEY FINDINGS", fontsize=8, family=MONO, color=ACCENT, weight="bold")
+        y -= 0.026
+        y = bullets(fig, y, [
             "Affine motion (scale, rotation) is solved to sub-pixel accuracy, even at large magnitude.",
             "Non-affine depth motion: every method blurs or destroys the depth boundary.",
             "The ceiling is the affine assumption, not the size of the motion.",
         ])
 
-        # author / version box
-        by = 0.205
-        fig.add_artist(plt.Rectangle((0.09, by - 0.10), 0.82, 0.10, facecolor="#f4f6f9",
-                       edgecolor=LINE, transform=fig.transFigure))
-        cells = [("AUTHOR", AUTHOR), ("ORGANISATION", ORG),
-                 ("VERSION", VERSION + "  ·  " + datetime.date.today().isoformat()),
-                 ("CONTACT", CONTACT), ("STATUS", "Working note — pre-publication"),
-                 ("SOURCE", "reproducible · src/benchmark_*.py")]
-        for i, (lab, val) in enumerate(cells):
-            cx = 0.11 + (i % 2) * 0.41
-            cy = by - 0.018 - (i // 2) * 0.03
-            fig.text(cx, cy, lab, fontsize=6.8, family=MONO, color=ACCENT, weight="bold", va="top")
-            fig.text(cx, cy - 0.013, val, fontsize=9, family=SERIF, color=INK, va="top")
+        y -= 0.016
+        info_box(fig, y, [
+            ("AUTHOR", AUTHOR), ("ORGANISATION", ORG),
+            ("VERSION", VERSION + "  ·  " + datetime.date.today().isoformat()),
+            ("CONTACT", CONTACT), ("STATUS", "Working note — pre-publication"),
+            ("SOURCE", "reproducible · src/benchmark_*.py")])
 
         fig.text(0.09, 0.075, "ImplicitKalman — working note   ·   " + VERSION
                  + "   ·   Generated " + datetime.date.today().isoformat(),
@@ -407,27 +436,22 @@ def build():
             "That is the gap. The probabilistic models that handle real scenes cannot be certified; "
             "the formal methods that can be certified cannot yet resolve depth. Neither is usable "
             "for safety-critical 3D as it stands.", lh=0.0178)
-        y -= 0.006
-        fig.text(0.09, y, "Outlook", fontsize=12, weight="bold", family=SERIF); y -= 0.028
+        y -= 0.020
+        fig.text(0.09, y, "Outlook", fontsize=12, weight="bold", family=SERIF); y -= 0.030
         y = body(fig, y,
             "We are building a formal, non-probabilistic method designed to stay sharp exactly "
             "where these blur — crisp at the depth boundary, accurate enough per pixel to drive 3D "
             "reconstruction. This note is the baseline it will be measured against.",
             color=ACCENT, lh=0.0178)
 
-        y -= 0.016
-        fig.add_artist(plt.Rectangle((0.09, y - 0.072), 0.82, 0.074, facecolor="#eef4fa",
-                       edgecolor=LINE, transform=fig.transFigure))
-        fig.text(0.105, y - 0.012, "METHOD NOTE", fontsize=7.5, family=MONO, color=ACCENT,
-                 weight="bold", va="top")
-        body(fig, y - 0.03,
+        y -= 0.018
+        y = note_box(fig, y, "METHOD NOTE",
             "Controlled synthetic scenes with pixel-exact ground truth (broadband texture; scaling "
             "and two-plane Z-dolly). EPE is the median over a central crop, excluding the "
             "focus-of-expansion core. M-PME is our faithful reimplementation of the described "
-            "method. All figures reproducible from source.",
-            size=8.5, x=0.105, width=96, color="#243542", lh=0.0155)
+            "method. All figures reproducible from source.", width=92)
 
-        y -= 0.10
+        y -= 0.022
         rule(fig, y); y -= 0.022
         fig.text(0.09, y, "REFERENCES", fontsize=8, family=MONO, color=MUTE, weight="bold")
         y -= 0.026
