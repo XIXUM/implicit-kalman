@@ -105,6 +105,7 @@ def main():
     show_depth(ax[1, 0], gt_depth, "Ground-truth depth", "#333")
     print("non-affine benchmark (Z-dolly, two-plane depth discontinuity):")
     print(f"  {'method':24s}  EPE all   EPE@edge   depth-RMSE")
+    depths = [("Ground truth", "#333", gt_depth)]
     for k, (name, color, fn) in enumerate(METHODS):
         U, V = fn(a, b)
         U, V, e = align(U, V, gu, gv, valid)
@@ -112,6 +113,7 @@ def main():
         d_rmse = np.sqrt(np.mean((np.clip(D, 2, 13) - np.clip(gt_depth, 2, 13))[valid] ** 2))
         show_flow(ax[0, k + 1], U, V, f"{name}\nEPE {np.median(e[valid]):.2f}px (edge {np.median(e[band]):.2f})", color)
         show_depth(ax[1, k + 1], D, f"depth from {name.split()[0]}", color)
+        depths.append((name, color, D))
         print(f"  {name:24s}  {np.median(e[valid]):6.2f}   {np.median(e[band]):7.2f}   {d_rmse:8.2f}")
 
     fig.suptitle("Perspective Z-dolly over varying depth — flow (top) and reconstructed depth (bottom)",
@@ -119,6 +121,18 @@ def main():
     p = os.path.join(HERE, "benchmark_nonaffine.png")
     fig.savefig(p, dpi=95); plt.close(fig)
     print("saved", p)
+
+    # cover hero: the depth row alone — crisp GT vs. broken reconstructions
+    figh, axh = plt.subplots(1, 4, figsize=(15, 4.1))
+    labels = ["Ground-truth depth\n(what 3D needs)", "from Fleet\n(noise)",
+              "from reimpl\n(ragged)", "from affine M-PME\n(blurred edge)"]
+    for axp, (name, color, D), lab in zip(axh, depths, labels):
+        axp.imshow(np.clip(D, 2, 13), cmap="viridis_r"); axp.axis("off")
+        axp.set_title(lab, fontsize=11, color=(color if name != "Ground truth" else "#333"))
+    figh.tight_layout()
+    ph = os.path.join(HERE, "benchmark_nonaffine_hero.png")
+    figh.savefig(ph, dpi=110, bbox_inches="tight"); plt.close(figh)
+    print("saved", ph)
 
 
 if __name__ == "__main__":
