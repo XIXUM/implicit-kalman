@@ -131,11 +131,13 @@ def build():
         eyebrow(fig, 0.95, "01 — THE STAKES")
         head(fig, 0.925, "Two ways to estimate motion"); y = 0.885
         y = body(fig, y,
-            "Learned monocular models — the neural depth and matching networks now driving the "
-            "field — are remarkably capable. But they are probabilistic by construction: no error "
-            "bound, no repeatable output, no provable worst case. The same scene in different light "
-            "returns different numbers. For a photo app, fine. For a system under functional-safety "
-            "standards — ISO 26262, DO-178C, IEC 62304 — it is disqualifying.")
+            "Learned monocular models are advancing fast. Robbyant's LingBot-Map (Ant Group), for "
+            "one, reconstructs 3D scenes from a single RGB camera in real time — streaming, "
+            "end-to-end, ~20 FPS, open-source [6]. Impressive engineering. But it is a trained "
+            "neural network: probabilistic by construction — no error bound, no repeatable output, "
+            "no provable worst case. The same scene in different light can return different numbers. "
+            "For a photo app, fine. Under functional-safety standards — ISO 26262, DO-178C, "
+            "IEC 62304 — it is disqualifying.")
         y = body(fig, y,
             "This work takes the opposite stance: formal, non-probabilistic estimation, derived "
             "from signal theory rather than trained from data. Every output is reproducible and "
@@ -280,6 +282,8 @@ def build():
             "processing. ACM Trans. Graphics (SIGGRAPH), 2013.",
             "M. Z. Li, Z. T. Yan, G. Liu & Z. Mao. Large amplitude motion estimation via multi-scale "
             "phase-based video processing. Mech. Syst. Signal Process. 253 (2026) 114301.",
+            "Robbyant (Ant Group). LingBot-Map: streaming 3D reconstruction from monocular RGB "
+            "video. 2026. arXiv:2604.14141; github.com/Robbyant/lingbot-map.",
         ]
         for i, r in enumerate(refs, 1):
             fig.text(0.09, y, f"[{i}]", fontsize=8, family=MONO, color=ACCENT, va="top")
