@@ -24,8 +24,8 @@ NONAFF = os.path.join(SRC, "benchmark_nonaffine.png")
 
 VERSION = "Draft v0.2"
 AUTHOR = "Felix Schaller"
-ORG = "XIXUM · ImplicitKalman"
-CONTACT = "felix@ftc-creative.de"
+ORG = "FelixSchallerCOM"
+CONTACT = "inquiry@felixschaller.com"
 
 A4 = (8.27, 11.69)
 INK = "#10202f"; ACCENT = "#12507e"; SIGNAL = "#c0392b"; MUTE = "#5b6a78"; LINE = "#d4dbe2"
