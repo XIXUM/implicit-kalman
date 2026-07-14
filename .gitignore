@@ -165,3 +165,4 @@ cython_debug/
 # generated benchmark output figures
 src/phaseflow_result.png
 src/mpme_result.png
+src/benchmark_gt_*.png
