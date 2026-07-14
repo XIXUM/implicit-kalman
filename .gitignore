@@ -166,3 +166,6 @@ cython_debug/
 src/phaseflow_result.png
 src/mpme_result.png
 src/benchmark_gt_*.png
+src/benchmark_epe_3methods.png
+src/benchmark_vectorfields.png
+src/benchmark_cover_hero.png

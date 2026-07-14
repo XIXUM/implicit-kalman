@@ -1,11 +1,17 @@
 """
 M-PME — Multi-scale Phase-based Motion Estimation (large-amplitude).
 
-Reimplementation of the coarse-to-fine idea in
-  "Large amplitude motion estimation via multi-scale phase-based video
-   processing" (2026, Mech. Syst. Signal Process. S0888327026004589),
-which itself is the classic coarse-to-fine phase flow (Gautama & Van Hulle 2002;
-Fleet & Weiss 2005) applied for large motion.
+SIMPLIFIED reimplementation of the coarse-to-fine idea in
+  M.Z. Li, Z.T. Yan, G. Liu, Z. Mao, "Large amplitude motion estimation via
+  multi-scale phase-based video processing", Mech. Syst. Signal Process. 253
+  (2026) 114301. doi:10.1016/j.ymssp.2026.114301
+
+IMPORTANT — this is NOT faithful to the paper. The real M-PME fits an AFFINE
+motion model (6 params) over a window via a Farnebaeck-style integral-image least
+squares (their Eq. 15-23), with the Eq. 7 confidence and Eq. 8 directional mask.
+This file instead fits a per-pixel 2-param translation, which is why it degrades
+on scaling. Because scale/rotation ARE affine, the faithful method is expected to
+handle them far better than this simplification does. A faithful port is TODO.
 
 Idea: a single phase-based estimate is limited to |delta| < lambda/2 (phase wraps
 past +-pi). A large displacement is decomposed across a Gaussian pyramid: at the

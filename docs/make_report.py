@@ -236,7 +236,8 @@ def build_pdf():
         y = body(fig, y,
             "Gaussian pyramid (5 levels), coarse-to-fine with rewarping and per-level residual "
             "refinement, no phase unwrapping, motion-field fusion across scales. Reimplementation "
-            "of the method described in Zhang et al. 2026 (Mech. Syst. Signal Process.), not the "
+            "of the method described in 'Large amplitude motion estimation via multi-scale "
+            "phase-based video processing' (Mech. Syst. Signal Process. 2026), not the "
             "original paywalled code.", lh=0.018)
         figure_image(fig, MPME_PNG, 0.80, 0.40,
                      "Fig. B1  A, B; UV magnitude + vector field; UV centre slices; divergence "
