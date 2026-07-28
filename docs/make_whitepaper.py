@@ -415,9 +415,52 @@ def build():
             "the one place where accuracy is non-negotiable.", lh=0.0178)
         pdf.savefig(fig); plt.close(fig)
 
+        # ================================================================ the wider field
+        fig = page()
+        eyebrow(fig, 0.95, "06 — THE WIDER FIELD")
+        head(fig, 0.925, "Localization is solved. Dense reconstruction is not."); y = 0.885
+        y = body(fig, y,
+            "Two objections greet any claim that 3D perception is unsolved: 'camera-only SLAM "
+            "already works' and 'learned models already reconstruct scenes from a phone.' Both are "
+            "true — and neither closes the gap. They sit on opposite sides of a hard line.",
+            lh=0.0178, width=94)
+        y -= 0.004
+        y = lead(fig, y, "Sparse geometry — solved, deployed, certifiable.",
+            "Feature-based visual and visual-inertial SLAM is mature. ORB-SLAM3 [9] tracks a handful "
+            "of keypoints across frames, triangulates them, and refines the camera trajectory by "
+            "bundle adjustment — real-time, on a phone, robust to dirt and glare. It ships "
+            "commercially for camera-only localization, e.g. Main Street Autonomy's Pose Engine "
+            "[10]. But note what it returns: a 6-DoF pose and a SPARSE cloud of feature points — a "
+            "few thousand, not a surface. And a single camera carries an inherent scale ambiguity: "
+            "it recovers geometry only up to an unknown scale factor, resolvable solely with an "
+            "IMU, a known dimension, or GNSS.")
+        y = lead(fig, y, "Dense reconstruction — the learned land-grab.",
+            "The dense problem — a depth at every pixel — is where the field has moved, and it has "
+            "moved to learning. NAVER's DUSt3R [11] regresses dense pointmaps from an uncalibrated "
+            "image pair; MASt3R [12] adds metric scale and matching; VGGT [13] (CVPR 2025) makes it "
+            "feed-forward over hundreds of views in under a second; Robbyant's LingBot-Map [8] "
+            "productizes it as real-time streaming. The results are genuinely impressive — and, "
+            "being trained networks, probabilistic: no bound, no repeatable worst case.")
+        y = lead(fig, y, "The tell — nobody trusts the prior alone.",
+            "The most revealing signal is what comes next. The 2025-26 follow-ups immediately bolt "
+            "classical geometry back onto the learned prior — 'probabilistic geometric fusion' of "
+            "VGGT priors for robust dense SLAM, collaborative dense SLAM with learned reconstruction "
+            "priors. A field confident in its dense output would not re-introduce optimization and "
+            "fusion to stabilize it. The learned map is a strong guess that still needs a geometric "
+            "spine.")
+        y -= 0.004
+        y = body(fig, y,
+            "So the landscape has two camps and a wall between them: sparse geometry that is "
+            "certifiable but not dense, and dense learning that is dense but not certifiable. The "
+            "sheer volume of 2024-26 work is the proof the problem is real and open — everyone is "
+            "pushing on it. What nobody has shipped is dense reconstruction that is at once accurate "
+            "at the depth boundary and formally guaranteed. That is the gap this note is about.",
+            lh=0.0178, width=94)
+        pdf.savefig(fig); plt.close(fig)
+
         # ================================================================ gap + outlook + refs
         fig = page()
-        eyebrow(fig, 0.95, "06 — THE GAP")
+        eyebrow(fig, 0.95, "07 — THE GAP")
         head(fig, 0.925, "Sharp on affine. Blind at depth."); y = 0.885
         fig.add_artist(plt.Line2D([0.09, 0.09], [0.80, 0.878], color=ACCENT, lw=3,
                        transform=fig.transFigure))
@@ -451,10 +494,10 @@ def build():
             "focus-of-expansion core. M-PME is our faithful reimplementation of the described "
             "method. All figures reproducible from source.", width=92)
 
-        y -= 0.022
-        rule(fig, y); y -= 0.022
+        y -= 0.016
+        rule(fig, y); y -= 0.020
         fig.text(0.09, y, "REFERENCES", fontsize=8, family=MONO, color=MUTE, weight="bold")
-        y -= 0.026
+        y -= 0.022
         refs = [
             "D. J. Fleet & A. D. Jepson. Computation of component image velocity from local phase "
             "information. Int. J. Computer Vision 5(1), 1990.",
@@ -471,13 +514,23 @@ def build():
             "phase-based video processing. Mech. Syst. Signal Process. 253 (2026) 114301.",
             "Robbyant (Ant Group). LingBot-Map: streaming 3D reconstruction from monocular RGB "
             "video. 2026. arXiv:2604.14141; github.com/Robbyant/lingbot-map.",
+            "C. Campos, R. Elvira, J. J. Gomez Rodriguez, J. M. M. Montiel & J. D. Tardos. "
+            "ORB-SLAM3: accurate visual, visual-inertial and multi-map SLAM. IEEE T-RO 37(6), 2021.",
+            "Main Street Autonomy. Pose Engine — targetless, camera-only 6DoF localization. "
+            "mainstreetautonomy.com/docs/pose-engine.",
+            "S. Wang, V. Leroy, Y. Cabon, B. Chidlovskii & J. Revaud (NAVER). DUSt3R: geometric 3D "
+            "vision made easy. CVPR 2024.",
+            "V. Leroy, Y. Cabon & J. Revaud (NAVER). Grounding image matching in 3D with MASt3R. "
+            "ECCV 2024. arXiv:2406.09756.",
+            "J. Wang, M. Chen, N. Karaev, A. Vedaldi, C. Rupprecht & D. Novotny. VGGT: visual "
+            "geometry grounded transformer. CVPR 2025. arXiv:2503.11651.",
         ]
         for i, r in enumerate(refs, 1):
-            fig.text(0.09, y, f"[{i}]", fontsize=7.5, family=MONO, color=ACCENT, va="top")
-            for ln in textwrap.wrap(r, width=108):
-                fig.text(0.12, y, ln, fontsize=7.5, family=MONO, color=MUTE, va="top")
-                y -= 0.0135
-            y -= 0.003
+            fig.text(0.09, y, f"[{i}]", fontsize=7, family=MONO, color=ACCENT, va="top")
+            for ln in textwrap.wrap(r, width=118):
+                fig.text(0.122, y, ln, fontsize=7, family=MONO, color=MUTE, va="top")
+                y -= 0.0125
+            y -= 0.0026
         pdf.savefig(fig); plt.close(fig)
 
     print("wrote", OUT)
