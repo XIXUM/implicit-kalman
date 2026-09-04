@@ -30,17 +30,21 @@ Dynamic Video) and ImplicitKalman's deterministic, verifiable phase estimator.
   mover discriminator holds.
 
 ## OPEN / UNSOLVED (honest)
-- **The deterministic estimator is PARKED.** Its octave-to-octave offset induction is not yet
-  reliable on real images: on synthetic broadband GT it is sub-pixel, but on real nuScenes it
-  is range-limited (under-estimated 5.9 px where the true motion was 17.6 px -> Phase-1 depth
-  failed with our own flow, 114% err, while RAFT gave 3%). It is also blobby in flat regions
-  (phase singularity / aperture, not fixable by smoothing) and shows a per-octave +-pi wrap
-  quadrant break at the range limit.
-  - **Next step for the estimator (do FIRST, before real images again):** get the coarse->fine
-    offset induction RELIABLE on SIMPLE test images (the checker patterns in
-    `ImplicitKalman/src/relief0*.png` etc.) - prove a coarse-octave offset transfers cleanly
-    into the next finer octave, one octave at a time - THEN return to real footage. Until that
-    single step is reliable, the estimator is not deployable.
+- **The deterministic estimator: coarse->fine CHECKER GATE now PASSED (2026-09).** The gate we
+  defined - reliable octave-to-octave offset induction on the simple checker patterns
+  (`ImplicitKalman/src/relief0*.png`) - is met by our fresh image-warp c2f: translation 0.002 px
+  (global), scaling 0.357 px, rotation 0.154 px (dense median EPE), monotone per-octave
+  convergence, NO fine-octave corruption; actual folder pairs relief0->offs 100% / ->ro 98%
+  post-warp explained. So the octave induction is reliable; the user's remembered failure was
+  the OLD frequency-domain-Gabor-warp ComplexPyramidFlow2D (which could not handle the spectrum
+  shift - exactly the bug SCALING_SOLUTION.md fixed via image warping, which c2f does natively).
+  The estimator's FOUNDATION is sound. Validation script:
+  `digital-twin-motion/experiments/c2f_flow/runs/checker_coarse_to_fine.py`.
+  - **Remaining gap is REAL-IMAGE robustness, not the pyramid induction:** on real nuScenes the
+    flow is range-limited (under-estimated 5.9 px where the true motion was 17.6 px -> Phase-1
+    depth failed with our own flow, 114% err vs RAFT 3%), blobby in flat regions (phase
+    singularity / aperture, not fixable by smoothing), and shows a per-octave +-pi wrap quadrant
+    break at the range limit. That is the next work when the estimator is resumed.
 - **AI models (RAFT) prove a formal solution EXISTS** (they achieve consistent global dense
   flow) but the formal solution is not yet known. The phase approach (MIT line) is the right
   track; the pyramid-induction step is the specific gap.
@@ -54,8 +58,10 @@ Dynamic Video) and ImplicitKalman's deterministic, verifiable phase estimator.
   TRANSVERSE motion, LiDAR sees the RADIAL leading vehicle directly. Complementary blind spots.
 
 ## DECISION (for following threads)
-1. **Park the deterministic phase estimator.** Resume it only via the checker-pattern
-   coarse->fine reliability step above.
+1. **Deterministic phase estimator: checker gate PASSED (foundation sound).** Still parked
+   relative to real-image deployment; when resumed, the next work is real-image robustness
+   (range on large near-object motion, flat-region aperture, edge/occlusion, compression),
+   NOT the octave induction (which is verified reliable).
 2. **Continue Phase 2 (mover detection) consistently**, using RAFT flow as the front-end
    stand-in (it is a validation reference, NOT the certifiable target; swap in our own flow
    once its range is reliable). Next Phase-2 work: spatial coherence to kill edge FPs, restrict
