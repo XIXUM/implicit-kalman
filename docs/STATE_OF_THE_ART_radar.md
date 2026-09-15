@@ -18,6 +18,7 @@ intend to implement. This note is connective tissue only:
 | Work | What it is | Camp | Relevance to us |
 |---|---|---|---|
 | ORB-SLAM3 (Campos et al., 2021) | feature-based visual/-inertial SLAM | geometric, **sparse** | localization is solved; sparse points + 6DoF pose; monocular scale ambiguity |
+| NVIDIA cuVSLAM / PyCuVSLAM (2025) | GPU-accelerated visual SLAM (mono/stereo/RGB-D), Isaac ROS; Python bindings | geometric, **sparse** | fast + deployable, but geometric consistency ≠ semantic ground → no false-positive protection (loop-closure aliasing, dynamic scenes). See issue #4 |
 | Main Street Autonomy — Pose Engine (2026, commercial) | targetless camera-only 6DoF localization, deployed (farm tractors) | geometric, **sparse** | market signal: camera-only is real in safety-adjacent field. Our edge = certifiability, not novelty of "camera-only" |
 | Monocular VSLAM explainer (LinkedIn, 2026) | textbook sparse pipeline (features → triangulation → VO → loop closure → pose-graph) | geometric, **sparse** | not new; reinforces "sparse geometry = solved" |
 | DUSt3R → MASt3R → VGGT (NAVER et al., 2024–25) | learned dense pointmaps / metric depth, feed-forward | learned, **dense** | the dense land-grab; impressive, **probabilistic** |
