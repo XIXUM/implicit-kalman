@@ -23,6 +23,7 @@ intend to implement. This note is connective tissue only:
 | Monocular VSLAM explainer (LinkedIn, 2026) | textbook sparse pipeline (features → triangulation → VO → loop closure → pose-graph) | geometric, **sparse** | not new; reinforces "sparse geometry = solved" |
 | DUSt3R → MASt3R → VGGT (NAVER et al., 2024–25) | learned dense pointmaps / metric depth, feed-forward | learned, **dense** | the dense land-grab; impressive, **probabilistic** |
 | LingBot-Map (Robbyant / Ant Group, 2026) | productized streaming dense monocular 3D | learned, **dense** | same, deployed & real-time; still learned/probabilistic |
+| TrackEverything (CMU & Meta, 2026; arXiv 2609.30222) | learned dense 3D point tracking in world coords, long-horizon (1000+ frames), voxel-de-dup; eval on TAPVid-3D | learned, **dense / 4D tracking** | closest learned SOTA to our dense-motion / mover-detection goal → **benchmark candidate** (adopt TAPVid-3D). 40 GB GPU, learned/probabilistic; *not* Kalman — the "trajectory refiner" is a learned module, Kalman only in spirit. Part of a 2025–26 wave (Track4World, St4RTrack, Multi-View 3D PT) |
 | Kalman-filter framing (D. Kumawat, LinkedIn, 2026) | predict → measure → update state estimation under uncertainty | geometric, **sparse** | the recognized discipline for sparse state; the bridge to our name (see §2) |
 
 ---
@@ -79,6 +80,11 @@ claim.
   removes the "but the Kalman filter is probabilistic" objection.
 - **Watch** MSA / LingBot as deployment proof that camera-only is viable; the
   differentiator to hold onto is certifiability (grounded, not learned).
+- **Adopt TAPVid-3D as the external dense-motion benchmark.** It is the arena of
+  the world-centric dense-3D-tracking wave (TrackEverything, Track4World,
+  St4RTrack, …), which is exactly our "phase flow → 3D → mover detection" target.
+  TrackEverything is the learned SOTA to measure against — the point is not to beat
+  its accuracy but to contrast it on certifiability and cost (40 GB GPU, learned).
 
 ---
 
